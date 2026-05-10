@@ -45,7 +45,18 @@ unsafe fn apply(target: &Target, pool_size: u32) {
     let mut applied = 0usize;
     for patch in target.patches {
         let expected = patch.kind.compute(ORIGINAL_POOL_SIZE);
-        let actual = unsafe { read_u32(patch.addr) };
+        
+        let actual = match unsafe { read_u32(patch.addr) } {
+            Ok(val) => val,
+            Err(err) => {
+                eprintln!(
+                    "{LOG_TAG} {} skip {:#010x}: read failed ({})",
+                    target.name, patch.addr, err
+                );
+                continue;
+            }
+        };
+
         if actual != expected {
             eprintln!(
                 "{LOG_TAG} {} skip {:#010x}: expected {:#x}, found {:#x}",
@@ -53,6 +64,7 @@ unsafe fn apply(target: &Target, pool_size: u32) {
             );
             continue;
         }
+
         let new_value = patch.kind.compute(pool_size);
         match unsafe { write_u32(patch.addr, new_value) } {
             Ok(()) => applied += 1,
